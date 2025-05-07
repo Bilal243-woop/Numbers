@@ -1,0 +1,206 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Lengkapi Kata Angka 11-20</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background-color: #8e44ad;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      color: white;
+      overflow: hidden;
+    }
+    .container {
+      text-align: center;
+    }
+    .word-container, .choices {
+      display: flex;
+      gap: 10px;
+      margin: 20px auto;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .letter-box {
+      width: 60px;
+      height: 60px;
+      background: white;
+      border-radius: 15px;
+      font-size: 2rem;
+      font-weight: bold;
+      color: black;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      user-select: none;
+      transition: transform 0.3s, background 0.3s;
+    }
+    .drop-zone.empty {
+      border: 2px dashed #ccc;
+    }
+    .letter-box.animate {
+      animation: pop 0.3s ease;
+    }
+    @keyframes pop {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); background: #2ecc71; }
+      100% { transform: scale(1); }
+    }
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 10px;
+      background: #2ecc71;
+      color: white;
+      font-size: 1rem;
+      cursor: pointer;
+      margin: 5px;
+    }
+    #result {
+      margin-top: 10px;
+      font-size: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Lengkapi Kata Angka</h1>
+    <div class="word-container" id="word"></div>
+    <div class="choices" id="choices"></div>
+    <div id="result"></div>
+    <button onclick="nextLevel()">Next</button>
+    <button onclick="undoLast()">Undo</button>
+  </div>  <script>
+    const levels = [
+      'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen',
+      'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'
+    ];
+    let current = 0;
+    let history = [];
+
+    function shuffle(array) {
+      return array.sort(() => Math.random() - 0.5);
+    }
+
+    function renderLevel() {
+      const wordContainer = document.getElementById('word');
+      const choicesContainer = document.getElementById('choices');
+      const result = document.getElementById('result');
+      wordContainer.innerHTML = '';
+      choicesContainer.innerHTML = '';
+      result.textContent = '';
+      history = [];
+
+      const word = levels[current].toUpperCase();
+      const letters = word.split('');
+      const hiddenIndexes = shuffle([...Array(letters.length).keys()]).slice(0, 3);
+
+      letters.forEach((char, i) => {
+        const box = document.createElement('div');
+        box.className = 'letter-box';
+        if (hiddenIndexes.includes(i)) {
+          box.classList.add('drop-zone', 'empty');
+          box.dataset.index = i;
+        } else {
+          box.textContent = char;
+        }
+        wordContainer.appendChild(box);
+      });
+
+      const missingLetters = hiddenIndexes.map(i => letters[i]);
+      const choices = shuffle(missingLetters.concat(shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')).slice(0, 3)));
+      choices.forEach(letter => {
+        const choice = document.createElement('div');
+        choice.className = 'letter-box draggable';
+        choice.textContent = letter;
+        choice.dataset.letter = letter;
+        setupDragTouch(choice);
+        choicesContainer.appendChild(choice);
+      });
+    }
+
+    function setupDragTouch(el) {
+      el.addEventListener('touchstart', startDrag, false);
+      el.addEventListener('mousedown', startDrag, false);
+    }
+
+    function startDrag(e) {
+      const touch = e.touches ? e.touches[0] : e;
+      const dragItem = e.currentTarget;
+      const clone = dragItem.cloneNode(true);
+      clone.style.position = 'absolute';
+      clone.style.left = `${touch.pageX - 30}px`;
+      clone.style.top = `${touch.pageY - 30}px`;
+      clone.style.zIndex = 1000;
+      document.body.appendChild(clone);
+
+      function move(e2) {
+        const moveTouch = e2.touches ? e2.touches[0] : e2;
+        clone.style.left = `${moveTouch.pageX - 30}px`;
+        clone.style.top = `${moveTouch.pageY - 30}px`;
+      }
+
+      function end(e3) {
+        document.removeEventListener('touchmove', move);
+        document.removeEventListener('touchend', end);
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', end);
+
+        const endX = (e3.changedTouches ? e3.changedTouches[0] : e3).clientX;
+        const endY = (e3.changedTouches ? e3.changedTouches[0] : e3).clientY;
+
+        const drop = Array.from(document.querySelectorAll('.drop-zone')).find(zone => {
+          const rect = zone.getBoundingClientRect();
+          return endX >= rect.left && endX <= rect.right && endY >= rect.top && endY <= rect.bottom && zone.innerHTML === '';
+        });
+
+        if (drop) {
+          drop.textContent = dragItem.dataset.letter;
+          drop.classList.remove('empty');
+          drop.classList.add('animate');
+          dragItem.style.visibility = 'hidden';
+          history.push({ zone: drop, letter: dragItem.dataset.letter, choice: dragItem });
+          checkAnswer();
+        }
+        clone.remove();
+      }
+
+      document.addEventListener('touchmove', move);
+      document.addEventListener('touchend', end);
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', end);
+      e.preventDefault();
+    }
+
+    function checkAnswer() {
+      const boxes = document.querySelectorAll('#word .letter-box');
+      const userWord = Array.from(boxes).map(b => b.textContent).join('');
+      if (!userWord.includes('') && userWord.toLowerCase() === levels[current]) {
+        document.getElementById('result').textContent = 'Benar!';
+      }
+    }
+
+    function nextLevel() {
+      current = (current + 1) % levels.length;
+      renderLevel();
+    }
+
+    function undoLast() {
+      if (history.length > 0) {
+        const last = history.pop();
+        last.zone.textContent = '';
+        last.zone.classList.add('empty');
+        last.choice.style.visibility = 'visible';
+        document.getElementById('result').textContent = '';
+      }
+    }
+
+    renderLevel();
+  </script></body>
+</html>
